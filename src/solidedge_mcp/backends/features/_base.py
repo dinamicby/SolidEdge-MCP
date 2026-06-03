@@ -3,7 +3,9 @@ Base class for FeatureManager providing constructor and shared helpers.
 """
 
 import contextlib
+import functools
 import traceback
+from collections.abc import Callable
 from typing import Any
 
 import pythoncom
@@ -18,12 +20,113 @@ from ..logging import get_logger
 _logger = get_logger(__name__)
 
 
+def verifies_geometry(fn: Callable[..., Any]) -> Callable[..., Any]:
+    """Decorate a feature-creation method to confirm it actually built geometry.
+
+    Several Solid Edge COM feature calls silently no-op -- e.g. when the active
+    profile failed to close into a region -- yet they do not raise, so the
+    wrapped method returns ``status='created'`` with nothing built. This
+    decorator snapshots the ordered feature count before/after and, on apparent
+    success, downgrades the misleading result to an explicit error when the
+    count did not increase.
+
+    The check keys on the body's FACE COUNT (and Models.Count for the first
+    solid), NOT the feature-tree count -- a failed feature still adds a tree
+    node, so DesignEdgebarFeatures.Count is not a reliable geometry signal,
+    whereas a no-op leaves the body's face count unchanged. If those counts
+    cannot be read as ints (e.g. mocked tests, or no body), the decorator
+    passes the result through unchanged -- it never invents a failure it
+    cannot prove.
+    """
+
+    @functools.wraps(fn)
+    def wrapper(self: "FeatureManagerBase", *args: Any, **kwargs: Any) -> Any:
+        before = self._geometry_snapshot()
+        result = fn(self, *args, **kwargs)
+        if not (isinstance(result, dict) and "error" not in result):
+            return result
+        after = self._geometry_snapshot()
+        if self._no_geometry_created(before, after):
+            _logger.warning(
+                f"{fn.__name__} reported success but the body did not change "
+                f"(models {before[0]}->{after[0]}, faces {before[1]}->{after[1]}); "
+                f"reporting as a no-geometry error."
+            )
+            return {
+                "error": (
+                    "Feature reported success but no geometry was created: the "
+                    "body's face count did not change. The sketch profile is most "
+                    "likely open/invalid -- close it as a closed region first -- "
+                    "or the operation had no effect on the body."
+                ),
+                "attempted": result.get("type"),
+                "models_before": before[0],
+                "models_after": after[0],
+                "faces_before": before[1],
+                "faces_after": after[1],
+            }
+        return result
+
+    return wrapper
+
+
 class FeatureManagerBase:
     """Base providing __init__ and helpers shared across feature mixins."""
 
     def __init__(self, document_manager: Any, sketch_manager: Any) -> None:
         self.doc_manager = document_manager
         self.sketch_manager = sketch_manager
+
+    def _geometry_snapshot(self) -> tuple[int | None, int | None]:
+        """Return (models_count, body_face_count); None for unreadable.
+
+        Used by @verifies_geometry to detect feature calls that silently
+        created nothing. face_count is 0 when no body exists yet, the body's
+        face count when one does, and None when it cannot be read (e.g. mocked
+        COM objects) so the check stays conservative. ``type(x) is int`` guards
+        against MagicMock values in unit tests.
+        """
+        try:
+            doc = self.doc_manager.get_active_document()
+        except Exception:
+            return (None, None)
+        # Geometry verification needs a real Solid Edge document. Against a
+        # unittest.mock double there is nothing real to measure (its counts are
+        # arbitrary), so stay inert rather than invent failures in unit tests.
+        if type(doc).__module__.startswith("unittest.mock"):
+            return (None, None)
+        models: int | None = None
+        faces: int | None = None
+        with contextlib.suppress(Exception):
+            count = doc.Models.Count
+            models = count if type(count) is int else None
+        if models == 0:
+            faces = 0  # no body yet -> definitively zero faces
+        elif models is not None and models > 0:
+            with contextlib.suppress(Exception):
+                body = doc.Models.Item(1).Body
+                fc = body.Faces(FaceQueryConstants.igQueryAll).Count
+                faces = fc if type(fc) is int else None
+        return (models, faces)
+
+    @staticmethod
+    def _no_geometry_created(
+        before: tuple[int | None, int | None],
+        after: tuple[int | None, int | None],
+    ) -> bool:
+        """True only when we can PROVE the operation changed no geometry.
+
+        Success is a new solid (Models.Count grew, the base feature) or a change
+        in the body's face count (any add/cut/round/chamfer/hole). When neither
+        can be read we return False -- never claim a failure we cannot prove.
+        """
+        mb, ma = before[0], after[0]
+        if mb is not None and ma is not None and ma > mb:
+            return False  # base solid appeared
+        fb, fa = before[1], after[1]
+        if fb is not None and fa is not None:
+            return fa == fb  # body unchanged -> nothing was built
+        return False
 
     def _get_ref_plane(self, doc: Any, plane_index: int = 1) -> Any:
         """Get a reference plane from the document (1=Top/XY, 2=Right/YZ, 3=Front/XZ)"""

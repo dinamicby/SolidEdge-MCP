@@ -13,6 +13,7 @@ from ..constants import (
     LoftSweepConstants,
 )
 from ..logging import get_logger
+from ._base import verifies_geometry
 
 _logger = get_logger(__name__)
 
@@ -78,6 +79,7 @@ class CutoutMixin:
         except Exception as e:
             return {"error": str(e), "traceback": traceback.format_exc()}
 
+    @verifies_geometry
     def create_extruded_cutout(self, distance: float, direction: str = "Normal") -> dict[str, Any]:
         """
         Create an extruded cutout (cut) through the part using the active sketch profile.
@@ -125,6 +127,7 @@ class CutoutMixin:
         except Exception as e:
             return {"error": str(e), "traceback": traceback.format_exc()}
 
+    @verifies_geometry
     def create_extruded_cutout_through_all(self, direction: str = "Normal") -> dict[str, Any]:
         """
         Create an extruded cutout that goes through the entire part.

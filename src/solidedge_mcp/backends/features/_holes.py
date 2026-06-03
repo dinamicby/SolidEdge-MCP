@@ -8,6 +8,7 @@ from ..constants import (
     FaceQueryConstants,
 )
 from ..logging import get_logger
+from ._base import verifies_geometry
 
 _logger = get_logger(__name__)
 
@@ -15,6 +16,7 @@ _logger = get_logger(__name__)
 class HolesMixin:
     """Mixin providing hole creation methods."""
 
+    @verifies_geometry
     def create_hole(
         self,
         x: float,
@@ -79,6 +81,7 @@ class HolesMixin:
         except Exception as e:
             return {"error": str(e), "traceback": traceback.format_exc()}
 
+    @verifies_geometry
     def create_hole_through_all(
         self, x: float, y: float, diameter: float, plane_index: int = 1, direction: str = "Normal"
     ) -> dict[str, Any]:
