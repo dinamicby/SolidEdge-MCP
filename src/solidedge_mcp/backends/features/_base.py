@@ -70,6 +70,22 @@ def verifies_geometry(fn: Callable[..., Any]) -> Callable[..., Any]:
     return wrapper
 
 
+def verify_geometry_on_creators(cls: type) -> type:
+    """Class decorator: wrap every ``create_*`` method with @verifies_geometry.
+
+    Apply only to mixins whose create_* methods ALL change the solid body
+    (add or remove material) -- extrude, revolve, holes, cutout, primitives.
+    Do NOT use on mixins with geometry-neutral creators (draft, cosmetic
+    thread, surface/ref-plane builders): a successful such op leaves the face
+    count unchanged and would be misreported as a no-op. Those need per-method
+    decoration with a deliberate skip-list instead.
+    """
+    for name, attr in list(vars(cls).items()):
+        if name.startswith("create_") and callable(attr):
+            setattr(cls, name, verifies_geometry(attr))
+    return cls
+
+
 class FeatureManagerBase:
     """Base providing __init__ and helpers shared across feature mixins."""
 

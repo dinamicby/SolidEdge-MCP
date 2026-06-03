@@ -8,15 +8,15 @@ from ..constants import (
     FeatureOperationConstants,
 )
 from ..logging import get_logger
-from ._base import verifies_geometry
+from ._base import verify_geometry_on_creators
 
 _logger = get_logger(__name__)
 
 
+@verify_geometry_on_creators
 class ExtrudeMixin:
     """Mixin providing extrude protrusion methods."""
 
-    @verifies_geometry
     def create_extrude(
         self, distance: float, operation: str = "Add", direction: str = "Normal"
     ) -> dict[str, Any]:
@@ -75,7 +75,6 @@ class ExtrudeMixin:
             _logger.error(f"Extrude failed: {e}")
             return {"error": str(e), "traceback": traceback.format_exc()}
 
-    @verifies_geometry
     def create_extrude_symmetric(self, distance: float) -> dict[str, Any]:
         """
         Create a symmetric extrusion (extends equally in both directions).

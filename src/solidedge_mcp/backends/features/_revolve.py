@@ -16,15 +16,15 @@ from ..constants import (
     TreatmentTypeConstants,
 )
 from ..logging import get_logger
-from ._base import verifies_geometry
+from ._base import verify_geometry_on_creators
 
 _logger = get_logger(__name__)
 
 
+@verify_geometry_on_creators
 class RevolveMixin:
     """Mixin providing revolve protrusion methods."""
 
-    @verifies_geometry
     def create_revolve(self, angle: float = 360, operation: str = "Add") -> dict[str, Any]:
         """
         Create a revolve feature from the active sketch profile.
@@ -78,7 +78,6 @@ class RevolveMixin:
         except Exception as e:
             return {"error": str(e), "traceback": traceback.format_exc()}
 
-    @verifies_geometry
     def create_revolve_finite(self, angle: float, axis_type: str = "CenterLine") -> dict[str, Any]:
         """
         Create a finite revolve feature.
@@ -284,7 +283,6 @@ class RevolveMixin:
         except Exception as e:
             return {"error": str(e), "traceback": traceback.format_exc()}
 
-    @verifies_geometry
     def create_revolve_full(
         self, angle: float = 360.0, treatment_type: str = "None"
     ) -> dict[str, Any]:
