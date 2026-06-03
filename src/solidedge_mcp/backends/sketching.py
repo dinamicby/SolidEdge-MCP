@@ -749,7 +749,11 @@ class SketchManager:
         """
         Add a keypoint constraint connecting two sketch elements at specific points.
 
-        Keypoint indices: 0=start, 1=end for lines/arcs; 0=center for circles.
+        Keypoint indices are GEOMETRIC, 0-based: 0=start, 1=end, 2=midpoint for
+        lines/arcs; 0=center for circles. (Verified live: AddKeypoint(line, 1,
+        other, 0) welds line's end to other's start.) These are NOT the
+        KeyPointType enum values igKeyPointStart=1/igKeyPointEnd=2 -- that enum
+        belongs to other (extent/revolve) APIs and must not be used here.
 
         Args:
             element1_type: Type of first element ('line', 'circle', 'arc', etc.)
