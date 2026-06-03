@@ -29,7 +29,7 @@ class PhysicalPropsMixin(QueryManagerBase):
             Dict with volume, mass, surface area, center of gravity, moments of inertia
         """
         try:
-            _logger.info(f"Computing mass properties with density={density} kg/m³")
+            _logger.info(f"Computing mass properties with density={density} kg/m^3")
             doc, model = self._get_first_model()
 
             # ComputePhysicalPropertiesWithSpecifiedDensity(Density, Accuracy)
