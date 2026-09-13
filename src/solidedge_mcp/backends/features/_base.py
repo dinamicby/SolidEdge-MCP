@@ -6,7 +6,7 @@ import contextlib
 import functools
 import traceback
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Concatenate, ParamSpec
 
 import pythoncom
 from win32com.client import VARIANT
@@ -19,16 +19,21 @@ from ..logging import get_logger
 
 _logger = get_logger(__name__)
 
+_P = ParamSpec("_P")
+# Decorated methods live on mixins that are not FeatureManagerBase subclasses
+# statically, so ``self`` is typed as Any here.
+_Creator = Callable[Concatenate[Any, _P], dict[str, Any]]
 
-def verifies_geometry(fn: Callable[..., Any]) -> Callable[..., Any]:
+
+def verifies_geometry(fn: _Creator[_P]) -> _Creator[_P]:
     """Decorate a feature-creation method to confirm it actually built geometry.
 
     Several Solid Edge COM feature calls silently no-op -- e.g. when the active
     profile failed to close into a region -- yet they do not raise, so the
     wrapped method returns ``status='created'`` with nothing built. This
-    decorator snapshots the ordered feature count before/after and, on apparent
+    decorator snapshots the body's geometry before/after and, on apparent
     success, downgrades the misleading result to an explicit error when the
-    count did not increase.
+    body did not change.
 
     The check keys on the body's FACE COUNT (and Models.Count for the first
     solid), NOT the feature-tree count -- a failed feature still adds a tree
@@ -40,7 +45,7 @@ def verifies_geometry(fn: Callable[..., Any]) -> Callable[..., Any]:
     """
 
     @functools.wraps(fn)
-    def wrapper(self: "FeatureManagerBase", *args: Any, **kwargs: Any) -> Any:
+    def wrapper(self: Any, /, *args: _P.args, **kwargs: _P.kwargs) -> dict[str, Any]:
         before = self._geometry_snapshot()
         result = fn(self, *args, **kwargs)
         if not (isinstance(result, dict) and "error" not in result):

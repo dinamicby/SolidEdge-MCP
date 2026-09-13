@@ -29,8 +29,8 @@ def manage_sketch(
 
     For action='close': closed=True (default) validates the profile as a
     closed region (required for solids; welds polyline rectangles into a
-    region). The result includes 'valid' and 'validation_code' -- check
-    'valid' before building a feature. Pass closed=False for open profiles.
+    region). The result includes 'validation_code' (0 = clean close; other
+    values are a hint, not a hard failure). Pass closed=False for open profiles.
     """
     err = validate_numerics(x1=x1, y1=y1, x2=x2, y2=y2)
     if err:
